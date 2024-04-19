@@ -29,6 +29,30 @@ public class AccountUtils {
     public static final String TRANSFER_SUCCESS_CODE = "009";
     public static final String TRANSFER_SUCCESS_MESSAGE = "Transfer successfully ended";
 
+    public static final String OTP_ERROR_CODE = "010";
+    public static final String OTP_ERROR_MESSAGE = "OTP Error: You have not sent an otp";
+
+    public static final String OTP_CODE_SEND_CODE = "011";
+    public static final String OTP_CODE_SEND_MESSAGE = "OTP code send to this email: ";
+
+    public static final String OTP_EXPIRED_CODE = "012";
+    public static final String OTP_EXPIRED_MESSAGE = "OTP is already expired";
+
+    public static final String OTP_NOT_EQUAL_CODE = "013";
+    public static final String OTP_NOT_EQUAL_MESSAGE = "OTP is not equal to another one";
+
+    public static final String OTP_IS_CORRECT_CODE = "014";
+    public static final String OTP_IS_CORRECT_MESSAGE= "OTP is already correct";
+    public static String generateOtp() {
+        final int OTP_LENGTH = 6;
+
+        Random random = new Random();
+        StringBuilder otp = new StringBuilder();
+        for (int i = 0; i < OTP_LENGTH; i++) {
+            otp.append(random.nextInt(10));
+        }
+        return otp.toString();
+    }
 
     public static String generateIban() {
         final String KZ_IBAN_PREFIX = "KZ";

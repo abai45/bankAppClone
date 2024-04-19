@@ -10,10 +10,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class BankResponseDto {
-    private String responseCode;
-    private String responseMessage;
-    private AccountInfoDto accountInfo;
-    private OtpResponseDto otpResponse;
+public class OtpResponseDto {
+    private Boolean isOtpValid;
 }

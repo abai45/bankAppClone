@@ -1,6 +1,8 @@
 package kz.demo.bankApplication.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -26,16 +28,26 @@ public class UserEntity implements UserDetails {
     private Long id;
     private String firstName;
     private String lastName;
-    private String otherName;
     private String gender;
+
+    @Column(unique = true)
+    @Email(message = "Please enter email")
     private String email;
+
+    @Size(min = 8,message = "The password must have at least 5 characters")
     private String password;
     private String accountNumber;
     private BigDecimal accountBalance;
     private String phoneNumber;
-    private  String alternativePhoneNumber;
     private String status;
+
     private RoleEntity role;
+
+    private boolean enable;
+
+    private String verificationCode;
+
+
     @CreationTimestamp
     private LocalDateTime createdAt;
     @UpdateTimestamp

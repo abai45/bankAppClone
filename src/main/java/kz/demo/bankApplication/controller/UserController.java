@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
     @Autowired
     UserService userService;
+
     @Operation(
             summary = "Create New User Account",
             description = "Creating a new user and assigning an account ID"
@@ -23,12 +24,12 @@ public class UserController {
             description = "Http Status 201 CREATED"
     )
     @PostMapping
-    public BankResponseDto createAccount(@RequestBody UserRequestDto userRequestDto) {
+    public AuthorizationRequestDto createAccount(@RequestBody UserRequestDto userRequestDto) {
         return userService.createAccount(userRequestDto);
     }
 
     @PostMapping("/login")
-    public BankResponseDto login(@RequestBody LoginAccountDto loginAccountDto) {
+    public AuthorizationRequestDto login(@RequestBody LoginAccountDto loginAccountDto) {
         return userService.loginAccount(loginAccountDto);
     }
     @Operation(

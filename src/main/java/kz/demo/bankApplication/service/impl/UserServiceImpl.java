@@ -6,10 +6,13 @@ import kz.demo.bankApplication.entity.RoleEntity;
 import kz.demo.bankApplication.entity.UserEntity;
 import kz.demo.bankApplication.repository.UserRepository;
 import kz.demo.bankApplication.utils.AccountUtils;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -38,14 +41,14 @@ public class UserServiceImpl implements UserService{
     JwtTokenProvider jwtTokenProvider;
 
     @Override
-    public BankResponseDto createAccount(UserRequestDto userRequestDto) {
-    /**
-     * Сервис для добавления нового пользователя в ДБ
-     */
-        if(userRepository.existsByEmail(userRequestDto.getEmail())) {
-            BankResponseDto response = BankResponseDto.builder()
+    public AuthorizationRequestDto createAccount(UserRequestDto userRequestDto) {
+        /**
+         * Сервис для добавления нового пользователя в ДБ
+         */
+        if (userRepository.existsByEmail(userRequestDto.getEmail())) {
+            AuthorizationRequestDto response = AuthorizationRequestDto.builder()
                     .responseCode(AccountUtils.ACCOUNT_EXISTS_CODE)
-                    .responseMessage(AccountUtils.ACCOUNT_EXISTS_MESSAGE)
+                    .accessToken(AccountUtils.ACCOUNT_EXISTS_MESSAGE)
                     .accountInfo(null)
                     .build();
             return response;
@@ -54,43 +57,56 @@ public class UserServiceImpl implements UserService{
         UserEntity newUserEntity = UserEntity.builder()
                 .firstName(userRequestDto.getFirstName())
                 .lastName(userRequestDto.getLastName())
-                .otherName(userRequestDto.getOtherName())
                 .gender(userRequestDto.getGender())
                 .accountNumber(AccountUtils.generateIban())
                 .accountBalance(BigDecimal.ZERO)
                 .email(userRequestDto.getEmail())
                 .password(passwordEncoder.encode(userRequestDto.getPassword()))
                 .phoneNumber(userRequestDto.getPhoneNumber())
-                .alternativePhoneNumber(userRequestDto.getAlternativePhoneNumber())
                 .status("ACTIVE")
-                .role(RoleEntity.valueOf("ROLE_USER"))
+                .role(RoleEntity.ROLE_USER)
+                .enable(false)
                 .build();
 
         UserEntity savedUserEntity = userRepository.save(newUserEntity);
 
-        // Отправка сообщения на почту
-        EmailDetailsDto emailDetailsDto = EmailDetailsDto.builder()
-                .recipient(savedUserEntity.getEmail())
-                .subject("Account creation")
-                .messageBody("Congratulations! Your Account has been succesfully created. \n" +
-                        "Your Account Details:\n" +
-                        "Account Name: "+ savedUserEntity.getFirstName() + " " + savedUserEntity.getLastName() + " " + savedUserEntity.getOtherName() + "\n" +
-                        "Account  Number: "+ savedUserEntity.getAccountNumber())
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            userRequestDto.getEmail(),
+                            userRequestDto.getPassword()
+                    )
+            );
 
-                .build();
-        emailService.sendEmailAlert(emailDetailsDto);
-        return BankResponseDto.builder()
-                .responseCode(AccountUtils.ACCOUNT_CREATION_SUCCESS_CODE)
-                .responseMessage(AccountUtils.ACCOUNT_CREATION_SUCCESS_MESSAGE)
-                .accountInfo(AccountInfoDto.builder()
-                        .accountName(savedUserEntity.getFirstName()+" "+ savedUserEntity.getLastName()+" "+ savedUserEntity.getOtherName())
-                        .accountBalance(savedUserEntity.getAccountBalance())
-                        .accountNumber(savedUserEntity.getAccountNumber())
-                        .build())
-                .build();
+            EmailDetailsDto emailDetailsDto = EmailDetailsDto.builder()
+                    .recipient(savedUserEntity.getEmail())
+                    .subject("Account creation")
+                    .messageBody("Congratulations! Your Account has been successfully created. \n" +
+                            "Your Account Details:\n" +
+                            "Account Name: " + savedUserEntity.getFirstName() + " " + savedUserEntity.getLastName() + "\n" +
+                            "Account Number: " + savedUserEntity.getAccountNumber())
+                    .build();
+            emailService.sendEmailAlert(emailDetailsDto);
+
+            return AuthorizationRequestDto.builder()
+                    .responseCode(AccountUtils.ACCOUNT_CREATION_SUCCESS_CODE)
+                    .accessToken(jwtTokenProvider.generateToken(authentication))
+                    .accountInfo(AccountInfoDto.builder()
+                            .accountName(savedUserEntity.getFirstName() + " " + savedUserEntity.getLastName())
+                            .accountBalance(savedUserEntity.getAccountBalance())
+                            .accountNumber(savedUserEntity.getAccountNumber())
+                            .build())
+                    .build();
+        } catch (AuthenticationException e) {
+            return AuthorizationRequestDto.builder()
+                    .responseCode("Authentication Failed")
+                    .accessToken("Failed to authenticate user after registration")
+                    .build();
+        }
     }
 
-    public BankResponseDto loginAccount(LoginAccountDto loginAccountDto) {
+    @Override
+    public AuthorizationRequestDto loginAccount(LoginAccountDto loginAccountDto) {
         Authentication authentication = null;
 
         authentication = authenticationManager.authenticate(
@@ -106,10 +122,11 @@ public class UserServiceImpl implements UserService{
                 .build();
 
         emailService.sendEmailAlert(loginAlert);
-        return BankResponseDto.builder()
+        return AuthorizationRequestDto.builder()
                 .responseCode("Login Success")
-                .responseMessage(jwtTokenProvider.generateToken(authentication))
+                .accessToken(jwtTokenProvider.generateToken(authentication))
                 .build();
+
     }
 
     @Override
@@ -129,7 +146,7 @@ public class UserServiceImpl implements UserService{
                 .accountInfo(AccountInfoDto.builder()
                         .accountBalance(userEntity.getAccountBalance())
                         .accountNumber(userEntity.getAccountNumber())
-                        .accountName(userEntity.getFirstName() +" "+ userEntity.getLastName()+ " " + userEntity.getOtherName())
+                        .accountName(userEntity.getFirstName() +" "+ userEntity.getLastName())
                         .build())
                 .build();
     }
@@ -141,7 +158,7 @@ public class UserServiceImpl implements UserService{
             return AccountUtils.ACCOUNT_NUMBER_DOES_NOT_EXISTS_MESSAGE;
         }
         UserEntity userEntity = userRepository.findByAccountNumber(request.getAccountNumber());
-        return userEntity.getFirstName() + " " + userEntity.getLastName() + " " + userEntity.getOtherName();
+        return userEntity.getFirstName() + " " + userEntity.getLastName();
     }
 
     @Override
@@ -172,7 +189,7 @@ public class UserServiceImpl implements UserService{
                 .accountInfo(AccountInfoDto.builder()
                         .accountBalance(userEntityToCredit.getAccountBalance())
                         .accountNumber(request.getAccountNumber())
-                        .accountName(userEntityToCredit.getFirstName()+" "+ userEntityToCredit.getLastName()+" "+ userEntityToCredit.getOtherName())
+                        .accountName(userEntityToCredit.getFirstName()+" "+ userEntityToCredit.getLastName())
                         .build())
                 .build();
 
@@ -215,7 +232,7 @@ public class UserServiceImpl implements UserService{
                     .responseMessage(AccountUtils.ACCOUNT_DEBITED_SUCCESS_MESSAGE)
                     .accountInfo(AccountInfoDto.builder()
                             .accountNumber(request.getAccountNumber())
-                            .accountName(userEntityToDebit.getFirstName()+" "+ userEntityToDebit.getLastName()+" " + userEntityToDebit.getOtherName())
+                            .accountName(userEntityToDebit.getFirstName()+" "+ userEntityToDebit.getLastName())
                             .accountBalance(userEntityToDebit.getAccountBalance())
                             .build())
                     .build();
@@ -246,8 +263,8 @@ public class UserServiceImpl implements UserService{
         }
         sourceAccount.setAccountBalance(sourceAccount.getAccountBalance().subtract(request.getAmount()));
         destinationAccount.setAccountBalance(destinationAccount.getAccountBalance().add(request.getAmount()));
-        String sourceUsername = sourceAccount.getFirstName()+ " "+ sourceAccount.getLastName()+" "+ sourceAccount.getOtherName();
-        String destinationUsername = destinationAccount.getFirstName()+ " "+ destinationAccount.getLastName()+" "+ destinationAccount.getOtherName();
+        String sourceUsername = sourceAccount.getFirstName()+ " "+ sourceAccount.getLastName();
+        String destinationUsername = destinationAccount.getFirstName()+ " "+ destinationAccount.getLastName();
         EmailDetailsDto debitAlert = EmailDetailsDto.builder()
                 .subject("DEBIT ALERT")
                 .recipient(sourceAccount.getEmail())
@@ -279,10 +296,5 @@ public class UserServiceImpl implements UserService{
                 .responseMessage(AccountUtils.TRANSFER_SUCCESS_MESSAGE)
                 .accountInfo(null)
                 .build();
-    }
-
-    public static void main(String[] args) {
-        UserServiceImpl userService = new UserServiceImpl();
-        System.out.println(userService.passwordEncoder.encode("12345"));
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -47,15 +48,16 @@ public class SecurityConfig {
     }
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                HttpMethod.POST, "/api/user"
-                        ).permitAll()
-                        .requestMatchers(
-                                HttpMethod.POST, "/api/user/login"
-                        ).permitAll()
-                        .anyRequest().authenticated());
+        httpSecurity
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeRequests(
+                        authorize -> authorize
+                                .requestMatchers("/api/user").permitAll()
+                                .requestMatchers("/api/user/login").permitAll()
+                                .requestMatchers("api/user/otpSend").permitAll()
+                                .requestMatchers("api/user/otpValidate").permitAll()
+                                .anyRequest().authenticated()
+                );
 
         httpSecurity.sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
